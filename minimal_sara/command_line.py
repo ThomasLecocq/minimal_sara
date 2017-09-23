@@ -2,7 +2,7 @@ import datetime
 import glob
 import itertools
 import os
-
+import logging
 import bottleneck as bn
 import click
 import matplotlib.pyplot as plt
@@ -10,8 +10,10 @@ import numpy as np
 import pandas as pd
 from configobj import ConfigObj
 from obspy import read, UTCDateTime, Stream
+from obspy.signal.util import next_pow_2
 from obspy.signal.filter import envelope as obspy_envelope
 
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 # from click_plugins import with_plugins
 def to_idds(net, sta, loc, chan, year, jday, hour):
@@ -43,6 +45,7 @@ def cli(ctx):
     config_file = os.path.join(os.getcwd(), "config.ini")
     config = ConfigObj(config_file)
     ctx.obj['config'] = config
+
     pass
 
 
@@ -51,9 +54,11 @@ def cli(ctx):
 def init(ctx):
     filelist = os.path.join(os.getcwd(), "filelist.csv")
     if os.path.isfile(filelist):
-        print("Init seems to be already done")
+        logging.debug("Init seems to be already done")
         return
-    df = pd.DataFrame([["0","0","0","0","1"],], columns=["net","sta","date","size","process_step"], index=[datetime.date(2010,1,1),])
+    df = pd.DataFrame([["0","0",datetime.date(2010,1,1),"0","1"],],
+                      columns=["net","sta","date","size","process_step"],
+                      index=["nopath",])
 
     df.to_csv(filelist, index_label="path")
     pass
@@ -75,7 +80,7 @@ def scan_archive(ctx):
         dates = pd.date_range(UTCDateTime(config["startdate"]).datetime,
                               UTCDateTime(config["enddate"]).datetime, freq="H")
     else:
-        print("data_format %s not supported" % data_format)
+        logging.debug("data_format %s not supported" % data_format)
         return
 
     network = config["network"]
@@ -95,16 +100,16 @@ def scan_archive(ctx):
             if path in filedb.index:
                 tmp = filedb.loc[path]
                 if tmp["size"] != filesize:
-                    print(tmp["size"], filesize)
-                    print("file changed")
+                    logging.debug(tmp["size"], filesize)
+                    logging.debug("file changed")
                     filedb.loc[path, "size"] = filesize
                     filedb.loc[path, "process_step"] = "E"
                     new_data = True
                 else:
-                    print("path is in the df already, and no size change")
+                    logging.debug("path is in the df already, and no size change")
                     new_data = False
             else:
-                print("we should add this file to the df")
+                logging.debug("we should add this file to the df")
                 new = pd.Series({
                     "net": network,
                     "sta": station,
@@ -127,38 +132,49 @@ def envelope(ctx):
     data_folder = config["data_folder"]
     filelist = os.path.join(os.getcwd(), "filelist.csv")
     filedb = pd.read_csv(filelist, index_col="path")
-    filedb = filedb[filedb.process_step == "E"]
-    if len(filedb) == 0:
-        print("No files to process")
+    tmp = filedb[filedb.process_step == "E"]
+    if len(tmp) == 0:
+        logging.debug("No files to process")
         return
 
-    print("Will process envelope for:", len(filedb), "files")
-    for file in filedb.index:
+    logging.debug("Will process envelope for:", len(tmp), "files")
+    for file in tmp.index:
         if not os.path.isfile(file):
-            print("%s NOT FOUND")
+            logging.debug("%s NOT FOUND")
             continue
 
         outfile = file.replace(data_folder, os.path.join(os.getcwd(),"ENV"))
-        print("will output to %s"%outfile)
+        logging.debug("will output to %s"%outfile)
         if not os.path.isdir(os.path.split(outfile)[0]):
             os.makedirs(os.path.split(outfile)[0])
 
         # PREPROCESS
+        logging.debug("Loading")
         st = read(file)
+        logging.debug("Detrend")
         st.detrend("demean")
+        logging.debug("Merge")
+        st.merge(method=1, fill_value="interpolate")
+        logging.debug("Taper")
         st.taper(max_percentage=None, max_length=1.0)
+        logging.debug("Filter")
         freqmin, freqmax = config["bandpass"]
         st.filter("bandpass", freqmin=float(freqmin), freqmax=float(freqmax),corners=8)
-
+        logging.debug(st)
         trace = st[0]
         n = int(config["env_sampling_rate"])
         sps = int(trace.stats.sampling_rate)
 
-        trace.data = obspy_envelope(trace.data)
+        logging.debug("Envelope")
+        from scipy.signal import hilbert
+        N = next_pow_2(trace.stats.npts)
+        trace.data = np.abs(hilbert(trace.data, N=N)[:trace.stats.npts])
+        logging.debug("Moving Median")
         trace.data = bn.move_median(trace.data, sps * n)
         trace.data = trace.data[n * sps - 1::sps * n]
         trace.stats.sampling_rate = 1. / float(n)
         trace.data = np.require(trace.data, np.float32)
+        logging.debug("Writing")
         trace.write(outfile, format="MSEED")
         del st, trace
         filedb.loc[file, "process_step"] = "R"
@@ -175,20 +191,20 @@ def ratio(ctx):
     filedb = pd.read_csv(filelist, index_col="path", parse_dates=["date",])
     tmp = filedb[filedb.process_step == "R"]
     if len(tmp) == 0:
-        print("No files to process")
+        logging.debug("No files to process")
         return
     groups = filedb.groupby("date")
     for date, group in groups:
         # date = pd.datetime(date)
         if "R" not in group["process_step"].values:
-            print("Nothing do to for %s"%date)
+            logging.debug("Nothing do to for %s"%date)
             continue
 
-        print(date)
+        logging.debug(date)
         traces = []
         stations = np.unique(sorted(group["sta"]))
         for station in stations:
-            print("Will load %s" % station)
+            logging.debug("Will load %s" % station)
             if data_format == "SDS":
                 path = to_sds("*", station, "*", "*", date.year,
                               "%03i" % date.dayofyear)
@@ -197,11 +213,12 @@ def ratio(ctx):
                                "%03i" % date.dayofyear, "*")
             data_folder = os.path.join(os.getcwd(), "ENV")
             path = os.path.join(data_folder, path)
-            print(path)
+            logging.debug(path)
             for file in glob.glob(path):
                 traces.append(read(file)[0])
 
         st = Stream(traces)
+        stations = np.unique([tr.stats.station for tr in st])
         for sta1, sta2 in itertools.combinations(stations,2):
             st1 = st.select(station=sta1)
             st1.merge(method=1, fill_value="interpolate")
@@ -237,18 +254,18 @@ def plot(ctx):
     config = ctx.obj["config"]["msara"]
     stations = config["stations"]
     smoothing = config["smoothing"]
-    plt.figure()
-    for sta1, sta2 in itertools.combinations(stations, 2):
-        pair = "%s_%s" % (sta1, sta2)
-        path = os.path.join(os.getcwd(), 'RATIO', pair, "*")
-        st = read(path, format="MSEED")
-        st.merge(method=1, fill_value="interpolate")
-        tr = st[0]
-        times = pd.date_range(tr.stats.starttime.datetime, tr.stats.endtime.datetime, freq="%ims"%(tr.stats.delta*1e3))
-        plt.plot(times, tr.data, label=pair)
-    plt.legend()
-    plt.title("Raw Ratios")
-    plt.grid(True)
+    # plt.figure()
+    # for sta1, sta2 in itertools.combinations(stations, 2):
+    #     pair = "%s_%s" % (sta1, sta2)
+    #     path = os.path.join(os.getcwd(), 'RATIO', pair, "*")
+    #     st = read(path, format="MSEED")
+    #     st.merge(method=1, fill_value="interpolate")
+    #     tr = st[0]
+    #     times = pd.date_range(tr.stats.starttime.datetime, tr.stats.endtime.datetime, freq="%ims"%(tr.stats.delta*1e3))
+    #     plt.plot(times, tr.data, label=pair)
+    # plt.legend()
+    # plt.title("Raw Ratios")
+    # plt.grid(True)
 
 
     for smooth in smoothing:
@@ -261,11 +278,13 @@ def plot(ctx):
             tr = st[0]
             sps_ratio = int(int(smooth) / tr.stats.delta)
 
-            tr.data = pd.rolling_median(tr.data, window=sps_ratio)
-            times = pd.date_range(tr.stats.starttime.datetime,
+            # tr.data = pd.rolling_median(tr.data, window=sps_ratio)
+            idx = pd.date_range(tr.stats.starttime.datetime,
                                   tr.stats.endtime.datetime,
                                   freq="%ims" % (tr.stats.delta * 1e3))
-            plt.plot(times, tr.data, label=pair)
+            df = pd.Series(tr.data, index=idx)
+            df = df.resample("%iS" % int(smooth)).median()
+            plt.plot(df.index, df, label=pair)
 
         plt.legend()
         plt.title("Smoothed ratios (smoothing=%is)"%int(smooth))
