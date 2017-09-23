@@ -37,3 +37,4 @@ smoothing = 600, 86400
 4. run "msara scan_archive"
 5. run "msara envelope"
 6. run "msara ratio"
+7. run "msara plot"
