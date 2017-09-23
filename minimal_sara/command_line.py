@@ -1,22 +1,16 @@
-import glob
-import click
 import datetime
-import traceback
-import logging
-import os
-import sys
-import time
-
+import glob
 import itertools
+import os
+
+import bottleneck as bn
 import click
-import pkg_resources
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from configobj import ConfigObj
 from obspy import read, UTCDateTime, Stream
 from obspy.signal.filter import envelope as obspy_envelope
-import bottleneck as bn
-import numpy as np
-import pandas as pd
 
 
 # from click_plugins import with_plugins
@@ -208,9 +202,7 @@ def ratio(ctx):
                 traces.append(read(file)[0])
 
         st = Stream(traces)
-        print(st)
         for sta1, sta2 in itertools.combinations(stations,2):
-            print(sta1, sta2)
             st1 = st.select(station=sta1)
             st1.merge(method=1, fill_value="interpolate")
 
@@ -234,7 +226,9 @@ def ratio(ctx):
             stR.write(os.path.join(env_output_dir, str(date.date()) + '.MSEED'),
                         format="MSEED", encoding="FLOAT32")
             del stR
-
+        for file in group.index:
+            filedb.loc[file, "process_step"] = "P"
+    filedb.to_csv(filelist)
 
 
 @click.command()
