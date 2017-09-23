@@ -194,7 +194,7 @@ def ratio(ctx):
                               "%03i" % date.dayofyear)
             elif data_format == "IDDS":
                 path = to_idds("*", station, "*", "*", date.year,
-                               "%03i" % date.dayofyear, "%02i" % date.hour)
+                               "%03i" % date.dayofyear, "*")
             data_folder = os.path.join(os.getcwd(), "ENV")
             path = os.path.join(data_folder, path)
             print(path)
