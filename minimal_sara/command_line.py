@@ -254,6 +254,9 @@ def plot(ctx):
     config = ctx.obj["config"]["msara"]
     stations = config["stations"]
     smoothing = config["smoothing"]
+    if type(smoothing) in [float, int, str]:
+        smoothing = [smoothing,]
+
     # plt.figure()
     # for sta1, sta2 in itertools.combinations(stations, 2):
     #     pair = "%s_%s" % (sta1, sta2)
