@@ -242,6 +242,7 @@ def ratio(ctx):
 def plot(ctx):
     config = ctx.obj["config"]["msara"]
     stations = config["stations"]
+    smoothing = config["smoothing"]
     plt.figure()
     for sta1, sta2 in itertools.combinations(stations, 2):
         pair = "%s_%s" % (sta1, sta2)
@@ -251,10 +252,32 @@ def plot(ctx):
         tr = st[0]
         times = pd.date_range(tr.stats.starttime.datetime, tr.stats.endtime.datetime, freq="%ims"%(tr.stats.delta*1e3))
         plt.plot(times, tr.data, label=pair)
-
     plt.legend()
+    plt.title("Raw Ratios")
     plt.grid(True)
+
+
+    for smooth in smoothing:
+        plt.figure()
+        for sta1, sta2 in itertools.combinations(stations, 2):
+            pair = "%s_%s" % (sta1, sta2)
+            path = os.path.join(os.getcwd(), 'RATIO', pair, "*")
+            st = read(path, format="MSEED")
+            st.merge(method=1, fill_value="interpolate")
+            tr = st[0]
+            sps_ratio = int(int(smooth) / tr.stats.delta)
+
+            tr.data = pd.rolling_median(tr.data, window=sps_ratio)
+            times = pd.date_range(tr.stats.starttime.datetime,
+                                  tr.stats.endtime.datetime,
+                                  freq="%ims" % (tr.stats.delta * 1e3))
+            plt.plot(times, tr.data, label=pair)
+
+        plt.legend()
+        plt.title("Smoothed ratios (smoothing=%is)"%int(smooth))
+        plt.grid(True)
     plt.show()
+
 cli.add_command(init)
 cli.add_command(scan_archive)
 cli.add_command(envelope)
