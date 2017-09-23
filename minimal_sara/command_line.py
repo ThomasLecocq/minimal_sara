@@ -98,7 +98,7 @@ def scan_archive(ctx):
                     print(tmp["size"], filesize)
                     print("file changed")
                     filedb.loc[path, "size"] = filesize
-                    filedb.loc[path, "processed"] = 0
+                    filedb.loc[path, "process_step"] = "E"
                     new_data = True
                 else:
                     print("path is in the df already, and no size change")
