@@ -171,7 +171,7 @@ def envelope(ctx):
         logging.debug("No files to process")
         return
 
-    logging.debug("Will process envelope for:", len(tmp), "files")
+    logging.debug("Will process envelope for: %s files "% len(tmp))
     for file in tmp.index:
         if not os.path.isfile(file):
             logging.debug("%s NOT FOUND")
