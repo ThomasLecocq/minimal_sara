@@ -94,6 +94,8 @@ def scan_archive(ctx):
             elif data_format == "IDDS":
                 path = to_idds(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
             path = os.path.join(data_folder, path)
+            if path.contains("*"):
+                path = glob.glob(path)[0]
             if not os.path.isfile(path):
                 continue
             filesize = os.stat(path).st_size
