@@ -92,6 +92,8 @@ def scan_archive(ctx, path):
     filelist = os.path.join(os.getcwd(), "filelist.csv")
     filedb = pd.read_csv(filelist, index_col="path")
 
+    startdate = UTCDateTime(config["startdate"])
+    enddate = UTCDateTime(config["enddate"])
     data_folder = config["data_folder"]
     data_format = config["data_format"]
     network = config["network"]
@@ -117,6 +119,9 @@ def scan_archive(ctx, path):
                         if tr.stats.station in stations:
                             if tr.stats.sampling_rate < (2* float(bandpass[1])):
                                 print("Trace sps too small, skiping")
+                                continue
+                            if (tr.stats.endtime <= startdate) or (tr.stats.starttime >= enddate):
+                                print("Data outside startdate-enddate")
                                 continue
                             filesize = os.stat(path).st_size
                             if path in filedb.index:
