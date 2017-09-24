@@ -28,6 +28,21 @@ def to_idds(net, sta, loc, chan, year, jday, hour):
     file=file.replace('TYPE', "D")
     return file
 
+def to_agung(net, sta, loc, chan, year, jday, hour):
+    SDS="YEAR/NET/STA/CHAN.TYPE/JDAY/"
+    file=SDS.replace('YEAR', "%04i"%year)
+    file=file.replace('NET', net)
+    file=file.replace('STA', sta)
+    file=file.replace('LOC', loc)
+    file=file.replace('CHAN', chan)
+    file=file.replace('JDAY', jday)
+    file = file.replace('HOUR', hour)
+    file=file.replace('TYPE', "D")
+    file += "NET.STA.*.*.$.YEAR.JDAY.HOUR"
+    file = glob.glob(file)[0]
+    return file
+
+
 def to_sds(net, sta, loc,chan, year, jday):
     SDS="YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
     file=SDS.replace('YEAR', "%04i"%year)
@@ -93,9 +108,9 @@ def scan_archive(ctx):
                 path = to_sds(network, station, location, channel, date.year, "%03i"% date.dayofyear)
             elif data_format == "IDDS":
                 path = to_idds(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
+            elif data_format == "AGUNG":
+                path = to_agung(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
             path = os.path.join(data_folder, path)
-            if path.contains("*"):
-                path = glob.glob(path)[0]
             if not os.path.isfile(path):
                 continue
             filesize = os.stat(path).st_size
@@ -210,7 +225,7 @@ def ratio(ctx):
             if data_format == "SDS":
                 path = to_sds("*", station, "*", "*", date.year,
                               "%03i" % date.dayofyear)
-            elif data_format == "IDDS":
+            elif data_format in ["IDDS" , "AGUNG"]:
                 path = to_idds("*", station, "*", "*", date.year,
                                "%03i" % date.dayofyear, "*")
             data_folder = os.path.join(os.getcwd(), "ENV")
@@ -258,7 +273,7 @@ def plot(ctx):
     smoothing = config["smoothing"]
     if type(smoothing) in [float, int, str]:
         smoothing = [smoothing,]
-
+    print(smoothing)
     # plt.figure()
     # for sta1, sta2 in itertools.combinations(stations, 2):
     #     pair = "%s_%s" % (sta1, sta2)
