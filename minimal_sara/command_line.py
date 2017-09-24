@@ -38,13 +38,12 @@ def to_agung(net, sta, loc, chan, year, jday, hour):
     file=file.replace('JDAY', jday)
     file = file.replace('HOUR', hour)
     file=file.replace('TYPE', "D")
-    file += "NET.STA.*.*.*.YEAR.JDAY.HOUR"
+    file += "NET.STA.*.*.*.JDAY.HOUR"
     file=file.replace('NET', net)
     file = file.replace('STA', sta)
     file = file.replace('YEAR', "%04i"%year)
     file = file.replace('JDAY', jday)
     file = file.replace('HOUR', hour)
-    file = glob.glob(file)[0]
     return file
 
 
@@ -107,15 +106,28 @@ def scan_archive(ctx):
     stations = config["stations"]
     location = config["location"]
     channel = config["channel"]
+    new_data = False
     for station in stations:
         for date in dates:
+
             if data_format == "SDS":
                 path = to_sds(network, station, location, channel, date.year, "%03i"% date.dayofyear)
+                path = os.path.join(data_folder, path)
             elif data_format == "IDDS":
                 path = to_idds(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
+                path = os.path.join(data_folder, path)
             elif data_format == "AGUNG":
                 path = to_agung(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
-            path = os.path.join(data_folder, path)
+                path = os.path.join(data_folder, path)
+                # print(path)
+                path = glob.glob(path)
+                # print(path)
+                if len(path) != 0:
+                    path = path[0]
+                    # print(path)
+                else:
+                    continue
+
             if not os.path.isfile(path):
                 continue
             filesize = os.stat(path).st_size
