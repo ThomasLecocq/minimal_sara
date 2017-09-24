@@ -38,3 +38,13 @@ smoothing = 600, 86400
 5. run "msara envelope"
 6. run "msara ratio"
 7. run "msara plot"
+
+Alternatively, if the archive is not properly structured (bad file naming, etc),
+you can replace step 4. with a direct call to a path:
+
+4. msara scan_archive --path C:\Users\thlec\Desktop\VOLCANO\IDDS
+
+This path will be scanned, recursively (all folders will be read) and files
+will be read, and if the tr.stats.station match what is configured in config.ini
+and if the tr.stats.sampling_rate is larger than twice the freq_max of the badnpass
+(in the config.ini above, it's 15, so traces with sps > 30 Hz will be accepted).

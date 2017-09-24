@@ -84,14 +84,70 @@ def init(ctx):
 
 
 @click.command()
+@click.option('--path',  help='Scan all files in specific folder, overrides the'
+                              ' default workflow step.')
 @click.pass_context
-def scan_archive(ctx):
+def scan_archive(ctx, path):
     config = ctx.obj["config"]["msara"]
     filelist = os.path.join(os.getcwd(), "filelist.csv")
     filedb = pd.read_csv(filelist, index_col="path")
 
     data_folder = config["data_folder"]
     data_format = config["data_format"]
+    network = config["network"]
+    stations = config["stations"]
+    location = config["location"]
+    channel = config["channel"]
+    bandpass = config["bandpass"]
+    new_data = False
+
+    if path:
+        for root, dirs, _ in os.walk(path):
+            for d in dirs:
+                tmppath = os.path.join(root, d)
+                _ = os.listdir(tmppath)
+                if not len(_):
+                    continue
+                for file in sorted(_):
+                    path = os.path.join(tmppath, file)
+                    if os.path.isfile(path):
+                        print(path)
+                        st = read(path)
+                        tr = st[0]
+                        if tr.stats.station in stations:
+                            if tr.stats.sampling_rate < (2* float(bandpass[1])):
+                                print("Trace sps too small, skiping")
+                                continue
+                            filesize = os.stat(path).st_size
+                            if path in filedb.index:
+                                tmp = filedb.loc[path]
+                                if tmp["size"] != filesize:
+                                    logging.debug(tmp["size"], filesize)
+                                    logging.debug("file changed")
+                                    filedb.loc[path, "size"] = filesize
+                                    filedb.loc[path, "process_step"] = "E"
+                                    new_data = True
+                                else:
+                                    logging.debug(
+                                        "path is in the df already, and no size change")
+                                    new_data = False
+                            else:
+                                logging.debug(
+                                    "Adding file to the process list")
+                                new = pd.Series({
+                                    "net": tr.stats.network,
+                                    "sta": tr.stats.station,
+                                    "date": tr.stats.starttime.date,
+                                    "size": filesize,
+                                    "process_step": "E"
+                                }, name=path)
+                                filedb = filedb.append(new)
+                                new_data = True
+        if new_data:
+            filedb.to_csv(filelist)
+
+        return
+
     if data_format == "SDS":
         dates = pd.date_range(UTCDateTime(config["startdate"]).datetime,
                               UTCDateTime(config["enddate"]).datetime, freq="D")
@@ -102,11 +158,7 @@ def scan_archive(ctx):
         logging.debug("data_format %s not supported" % data_format)
         return
 
-    network = config["network"]
-    stations = config["stations"]
-    location = config["location"]
-    channel = config["channel"]
-    new_data = False
+
     for station in stations:
         for date in dates:
 
@@ -143,7 +195,7 @@ def scan_archive(ctx):
                     logging.debug("path is in the df already, and no size change")
                     new_data = False
             else:
-                logging.debug("we should add this file to the df")
+                logging.debug("Adding file to the process list")
                 new = pd.Series({
                     "net": network,
                     "sta": station,
