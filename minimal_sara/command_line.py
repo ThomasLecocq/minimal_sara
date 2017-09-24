@@ -91,7 +91,7 @@ def scan_archive(ctx):
     if data_format == "SDS":
         dates = pd.date_range(UTCDateTime(config["startdate"]).datetime,
                               UTCDateTime(config["enddate"]).datetime, freq="D")
-    elif data_format == "IDDS":
+    elif data_format in ["IDDS", "AGUNG"]:
         dates = pd.date_range(UTCDateTime(config["startdate"]).datetime,
                               UTCDateTime(config["enddate"]).datetime, freq="H")
     else:
