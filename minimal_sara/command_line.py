@@ -39,6 +39,11 @@ def to_agung(net, sta, loc, chan, year, jday, hour):
     file = file.replace('HOUR', hour)
     file=file.replace('TYPE', "D")
     file += "NET.STA.*.*.*.YEAR.JDAY.HOUR"
+    file=file.replace('NET', net)
+    file = file.replace('STA', sta)
+    file = file.replace('YEAR', "%04i"%year)
+    file = file.replace('JDAY', jday)
+    file = file.replace('HOUR', hour)
     file = glob.glob(file)[0]
     return file
 
