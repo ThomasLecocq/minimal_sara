@@ -377,8 +377,13 @@ def plot(ctx):
                                   tr.stats.endtime.datetime,
                                   freq="%ims" % (tr.stats.delta * 1e3))
             df = pd.Series(tr.data, index=idx)
-            df = df.resample("%iS" % int(smooth)).median()
-            plt.plot(df.index, df, label=pair)
+            rs = df.resample("%iS" % int(smooth))
+            xmedian = rs.median()
+            xmean = rs.mean()
+            xmean.to_csv("%s_%s_mean.csv" % (pair, smooth))
+            xmedian.to_csv("%s_%s_median.csv" % (pair, smooth))
+            plt.plot(xmedian.index, xmedian, label="%s - median" % pair)
+            plt.plot(xmean.index, xmean, label="%s - mean" % pair)
 
         plt.legend()
         plt.title("Smoothed ratios (smoothing=%is)"%int(smooth))
