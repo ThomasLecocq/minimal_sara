@@ -296,7 +296,7 @@ def ratio(ctx):
             if data_format == "SDS":
                 path = to_sds("*", station, "*", "*", date.year,
                               "%03i" % date.dayofyear)
-            elif data_format in ["IDDS" , "AGUNG"]:
+            elif data_format == "IDDS":
                 path = to_idds("*", station, "*", "*", date.year,
                                "%03i" % date.dayofyear, "*")
             elif data_format == "AGUNG":
