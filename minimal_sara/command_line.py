@@ -176,12 +176,9 @@ def scan_archive(ctx, path):
             elif data_format == "AGUNG":
                 path = to_agung(network, station, location, channel, date.year, "%03i"% date.dayofyear, "%02i" % date.hour)
                 path = os.path.join(data_folder, path)
-                # print(path)
                 path = glob.glob(path)
-                # print(path)
                 if len(path) != 0:
                     path = path[0]
-                    # print(path)
                 else:
                     continue
 
@@ -302,6 +299,9 @@ def ratio(ctx):
             elif data_format in ["IDDS" , "AGUNG"]:
                 path = to_idds("*", station, "*", "*", date.year,
                                "%03i" % date.dayofyear, "*")
+            elif data_format == "AGUNG":
+                path = to_agung("*", station, "*", "*", date.year,
+                                "%03i" % date.dayofyear, "*")
             data_folder = os.path.join(os.getcwd(), "ENV")
             path = os.path.join(data_folder, path)
             logging.debug(path)
